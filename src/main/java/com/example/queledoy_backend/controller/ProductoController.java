@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.queledoy_backend.model.Producto;
 import com.example.queledoy_backend.service.ProductoService;
+import java.util.stream.Collectors;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,8 +34,10 @@ public class ProductoController {
     @GetMapping
     @Operation(summary = "Obtener todos los productos", description = "Devuelve una lista de todos los productos disponibles")
     @ApiResponse(responseCode = "200", description = "Lista de productos obtenida exitosamente")
-    public List<Producto> getAllProductos() {
-        return productoService.getAllProductos();
+    public ResponseEntity<List<ProductoDTO>> getAllProductos() {
+        List<Producto> productos = productoService.getAllProductos();
+        List<ProductoDTO> productosDTO = productos.stream().map(ProductoDTO::fromProducto).collect(Collectors.toList());
+        return ResponseEntity.ok(productosDTO);
     }
 
     @GetMapping("/{id}")
@@ -41,8 +46,45 @@ public class ProductoController {
         @ApiResponse(responseCode = "200", description = "Producto encontrado"),
         @ApiResponse(responseCode = "404", description = "Producto no encontrado")
     })
-    public Producto getProductoById(@PathVariable Integer id) {
-        return productoService.getProductoById(id);
+    public ResponseEntity<ProductoDTO> getProductoById(@PathVariable Integer id) {
+        Producto producto = productoService.getProductoById(id);
+        if (producto == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        return ResponseEntity.ok(ProductoDTO.fromProducto(producto));
+    }
+    // DTO para exponer los campos planos necesarios al frontend
+    public static class ProductoDTO {
+        public Integer id;
+        public String nombre_producto;
+        public Double precio;
+        public String descripcion_producto;
+        public String url_imagen;
+        public String categoria;
+        public String link_mercado;
+
+        public static ProductoDTO fromProducto(Producto producto) {
+            ProductoDTO dto = new ProductoDTO();
+            dto.id = producto.getId();
+            dto.nombre_producto = producto.getNombre();
+            dto.precio = producto.getPrecio();
+            dto.descripcion_producto = producto.getDescripcion();
+            // url_imagen: navega hasta producto.getImagenes().getImagen().getUrl() si existen
+            if (producto.getImagenes() != null && producto.getImagenes().getImagen() != null) {
+                dto.url_imagen = producto.getImagenes().getImagen().getUrl();
+            } else {
+                dto.url_imagen = null;
+            }
+            // categoria: navega hasta producto.getCategorias().getNombre() si existe
+            if (producto.getCategorias() != null) {
+                dto.categoria = producto.getCategorias().getNombre();
+            } else {
+                dto.categoria = null;
+            }
+            // link_mercado: usa el campo url
+            dto.link_mercado = producto.getUrl();
+            return dto;
+        }
     }
 
     @PostMapping
